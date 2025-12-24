@@ -1,0 +1,72 @@
+name: Deploy Marp Presentation to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/Presentation.md'
+      - 'docs/PRD_presentation.md'
+      - '.github/workflows/deploy-marp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Marp CLI
+        run: npm install -g @marp-team/marp-cli
+
+      - name: Create output directory
+        run: mkdir -p _site
+
+      - name: Convert Presentation.md to HTML
+        run: |
+          if [ -f "docs/Presentation.md" ]; then
+            marp docs/Presentation.md -o _site/presentation.html --html
+          fi
+
+      - name: Convert PRD_presentation.md to HTML
+        run: |
+          if [ -f "docs/PRD_presentation.md" ]; then
+            marp docs/PRD_presentation.md -o _site/index.html --html
+          fi
+
+      - name: Create index page if needed
+        run: |
+          if [ ! -f "_site/index.html" ] && [ -f "_site/presentation.html" ]; then
+            cp _site/presentation.html _site/index.html
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
